@@ -1,5 +1,5 @@
-require(kernlab)
 require(dplyr)
+require(plyr)
 require(rpart)
 require(readr)
 require(data.table)
@@ -27,13 +27,19 @@ main <- function()
 
   Final_Results <- list()
   
-  socioeconomic_factors <- c("co_bus_size_determination_code")
+  socioeconomic_factors <- c("women_owned_flag", "veteran_owned_flag", "eight_a_flag", "hubzone_flag", "srdvob_flag", "sdb_flag", "co_bus_size_determination_code")
   column_index <- which(colnames(FY15_df) %in% socioeconomic_factors)
-  socio <- c("co_bus_size_determination_code")
+  #socioeconomic_factors <- c("co_bus_size_determination_code")
+  #column_index <- which(colnames(FY15_df) %in% socioeconomic_factors)
+  #socio <- c("co_bus_size_determination_code")
+  
+  socio <- c("women_owned_flag", "veteran_owned_flag", "eight_a_flag", "hubzone_flag", "srdvob_flag", "sdb_flag", "co_bus_size_determination_code")
   
   BIC_Outcome <<- list()
   
-  for(m in 1:length(x))
+  #for(m in 1:length(x))
+  #{
+  for(m in 1:1)
   {
     #Filters for the transactions that are in the BIC List
     bic_ref_piids <- vehicle_df %>% filter(contract_name == x[m]) %>% select(`unique_contract_id`)%>% .$`unique_contract_id`
@@ -66,7 +72,7 @@ main <- function()
         psc_naics_combos <- unique(addressable_spend_values$psc_naics_combo)  
         SB_YES <- filter(df_flagged_yes, df_flagged_yes$psc_naics_combo== psc_naics_combos[k])
         SB_NO <- filter(df_flagged_no, df_flagged_no$psc_naics_combo == psc_naics_combos[k])
-        results[k,2] <- sum(SB_YES$dollars_obligated)
+        results[k, 2] <- sum(SB_YES$dollars_obligated)
         results[k,3] <- nrow(SB_YES)
         
         results[k,4] <- sum(SB_NO$dollars_obligated)
@@ -74,14 +80,15 @@ main <- function()
         
       }
       
+      name <- colnames(FY16_df)[column_index[i]]
       #names columns and outputs results
-      colnames(results) <- c("PSC_NAICs", "Value of SB", "Number of SB", "Value of non-SB", "Number of non-SB")
+      names(results) <- c("PSC_NAICs", paste("Value of", name), paste("Number of", name), paste("Value of non-", name), paste("Number of non", name))
       BIC_Outcome[[i]] <- results
       names(BIC_Outcome)[i] <- BIC[m]
       #iterative count - just to see where errors might occur
       print(colnames(FY16_df)[column_index[i]])
     }
-    Final_Results[[m]] <- BIC_Outcome
+    Final_Results[[1]] <- BIC_Outcome %>% Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="PSC_NAICs"), .)
     names(Final_Results)[m] <- BIC[m]
   }
 }
