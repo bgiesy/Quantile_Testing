@@ -1,0 +1,108 @@
+require(kernlab)
+require(dplyr)
+require(rpart)
+require(readr)
+require(data.table)
+
+main <- function()
+{
+  options(scipen=999)
+  print("Loading data")
+  FY15_df <- read.table("FY15_GWCM_FPDS_09122017.tsv", header = TRUE, comment.char = "", sep = "\t", quote = "", fill = TRUE, stringsAsFactors = FALSE)
+  FY16_df <- read.table("FY16_GWCM_FPDS_09122017.tsv", header = TRUE, comment.char = "", sep = "\t", quote = "", fill = TRUE, stringsAsFactors = FALSE)
+  
+  FY15_df$co_bus_size_determination_code[FY15_df$co_bus_size_determination_code == "O"] <- "NO"
+  FY15_df$co_bus_size_determination_code[FY15_df$co_bus_size_determination_code == "S"] <- "YES"
+  FY15_df$psc_naics_combo <- paste0(FY15_df$product_or_service_code, sep = "_", FY15_df$naics_code)
+  
+  FY16_df$co_bus_size_determination_code[FY16_df$co_bus_size_determination_code == "O"] <- "NO"
+  FY16_df$co_bus_size_determination_code[FY16_df$co_bus_size_determination_code == "S"] <- "YES"  
+  FY16_df$psc_naics_combo <- paste0(FY16_df$product_or_service_code, sep = "_", FY16_df$naics_code)
+  
+  vehicle_df <- read_csv("2017_06_20_Contract_Inventory_All_Fields.csv")
+  vehicle_df <<- filter(vehicle_df, vehicle_df$managing_agency == "GSA")
+  vehicle_df <- filter(vehicle_df, vehicle_df$tier == "BIC")
+  x <- unique(vehicle_df$contract_name)
+  BIC <- x
+
+  Final_Results <- list()
+  
+  socioeconomic_factors <- c("co_bus_size_determination_code")
+  column_index <- which(colnames(FY15_df) %in% socioeconomic_factors)
+  socio <- c("co_bus_size_determination_code")
+  
+  BIC_Outcome <<- list()
+  
+  for(m in 1:length(x))
+  {
+    #Filters for the transactions that are in the BIC List
+    bic_ref_piids <- vehicle_df %>% filter(contract_name == x[m]) %>% select(`unique_contract_id`)%>% .$`unique_contract_id`
+    transaction_df <- FY16_df %>% filter(reference_piid %in% bic_ref_piids)
+   
+    #Produces proportions of psc_naics based on BIC values
+    addressable_spend_values <- produce_proportion(transaction_df)
+    addressable_spend_values$Frequency <- addressable_spend_values$`BIC Count`/addressable_spend_values$`Total Count`
+    
+    threshold <- quantile(addressable_spend_values$Frequency, probs = c(0.05, 0.95))
+    addressable_spend_values <- addressable_spend_values[!(addressable_spend_values$Frequency < threshold[1]),]
+    print(paste0("Threshold is ", threshold[1]))
+    
+    #filters main df for only those transactions with psc_naics in the results -- data space saver.
+    df_all_flagged <- filter(FY16_df, FY16_df$psc_naics_combo %in% addressable_spend_values$psc_naics_combo)
+    
+    for(i in 1:length(socioeconomic_factors))
+    {
+      
+      df_flagged_yes <- filter(df_all_flagged, df_all_flagged[, column_index[i]] == "YES")
+      df_flagged_no <- filter(df_all_flagged, df_all_flagged[, column_index[i]] == "NO")
+      #Sum of all Yes
+      sum_flagged <- sum(df_flagged_yes$dollars_obligated)
+      results <- data.frame()
+      for(k in 1:nrow(addressable_spend_values))
+      {
+        
+        #stores and applies the proportions of the psc_naics
+        results[k,1] <- addressable_spend_values[k,1]
+        psc_naics_combos <- unique(addressable_spend_values$psc_naics_combo)  
+        SB_YES <- filter(df_flagged_yes, df_flagged_yes$psc_naics_combo== psc_naics_combos[k])
+        SB_NO <- filter(df_flagged_no, df_flagged_no$psc_naics_combo == psc_naics_combos[k])
+        results[k,2] <- sum(SB_YES$dollars_obligated)
+        results[k,3] <- nrow(SB_YES)
+        
+        results[k,4] <- sum(SB_NO$dollars_obligated)
+        results[k,5] <- nrow(SB_NO)
+        
+      }
+      
+      #names columns and outputs results
+      colnames(results) <- c("PSC_NAICs", "Value of SB", "Number of SB", "Value of non-SB", "Number of non-SB")
+      BIC_Outcome[[i]] <- results
+      names(BIC_Outcome)[i] <- BIC[m]
+      #iterative count - just to see where errors might occur
+      print(colnames(FY16_df)[column_index[i]])
+    }
+    Final_Results[[m]] <- BIC_Outcome
+    names(Final_Results)[m] <- BIC[m]
+  }
+}
+
+produce_proportion <- function(bic_df)
+{
+  unique_psc_naics_bic_combo <<- unique(bic_df$psc_naics_combo)
+  storage_df <- as.data.frame(NULL)
+  i <- length(unique_psc_naics_bic_combo)
+  value <- as.data.frame(NULL)
+  for(j in 1:i)
+  {
+    storage_df <- filter(bic_df, bic_df$psc_naics_combo == unique_psc_naics_bic_combo[j])
+    storage_df$dollars_obligated <- as.numeric(storage_df$dollars_obligated)
+    value[j,1] <- unique_psc_naics_bic_combo[j]
+    value[j,2] <- sum(storage_df$dollars_obligated)
+    value[j,3] <- nrow(storage_df)
+    value[j, 4] <- nrow(filter(FY16_df, FY16_df$psc_naics_combo == unique_psc_naics_bic_combo[j]))
+    colnames(value) <- c("psc_naics_combo", "Dollars Obligated", "BIC Count", "Total Count")
+  }
+  value$proportion <- value$`Dollars Obligated`/sum(FY16_df$dollars_obligated)
+ 
+  value
+}
