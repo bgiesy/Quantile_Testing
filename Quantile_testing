@@ -37,10 +37,10 @@ main <- function()
   
   BIC_Outcome <<- list()
   
-  #for(m in 1:length(x))
-  #{
-  for(m in 1:1)
+  for(m in 1:length(x))
   {
+  #for(m in 1:1)
+  #{
     #Filters for the transactions that are in the BIC List
     bic_ref_piids <- vehicle_df %>% filter(contract_name == x[m]) %>% select(`unique_contract_id`)%>% .$`unique_contract_id`
     transaction_df <- FY16_df %>% filter(reference_piid %in% bic_ref_piids)
@@ -88,7 +88,7 @@ main <- function()
       #iterative count - just to see where errors might occur
       print(colnames(FY16_df)[column_index[i]])
     }
-    Final_Results[[1]] <- BIC_Outcome %>% Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="PSC_NAICs"), .)
+    Final_Results[[m]] <- BIC_Outcome %>% Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="PSC_NAICs"), .)
     names(Final_Results)[m] <- BIC[m]
   }
 }
