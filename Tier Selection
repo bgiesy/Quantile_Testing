@@ -1,0 +1,47 @@
+  vehicle_df <- read_csv("2017_06_20_Contract_Inventory_All_Fields.csv")
+  vehicle_df <<- filter(vehicle_df, vehicle_df$managing_agency == "GSA")
+  tiers <- unique(vehicle_df$tier)
+  print(paste0(tiers))
+  a <- readline("What Tier are you interested in? ")
+  a <- as.character(unlist(strsplit(a, ",")))
+  while(all(a %in% tiers)== FALSE)
+  {
+    print("Invalid Entry. Please try again.")
+    a <- readline("What Tier are you interested in? ")
+    a <- as.character(unlist(strsplit(a, ",")))
+  }
+  vehicle_df <- filter(vehicle_df, vehicle_df$tier == a)
+  print("Data Loaded")
+  
+  unique_BIC <- unique(vehicle_df$contract_name)
+  print(paste0(unique_BIC))
+  x <- readline("What BICs do you want to analyze? Use commas to separate the values. If all, say ALL: ")
+  x <- as.character(unlist(strsplit(x, ", ")))
+  while(all(x %in% unique_BIC)== FALSE && x != "ALL")
+  {
+    print("Invalid Entry. Please try again.")
+    x <- readline("What contracts do you want to analyze? Use commas to separate the values. If all, say ALL: ")
+    x <- as.character(unlist(strsplit(x, ", ")))
+  }
+  if(x == "ALL")
+  {
+    x <- unique_BIC
+  }
+  
+  Final_Results <- list()
+  
+  socioeconomic_factors <- c("women_owned_flag", "veteran_owned_flag", "eight_a_flag", "hubzone_flag", "srdvob_flag", "sdb_flag", "co_bus_size_determination_code")
+  column_index <- which(colnames(df) %in% socioeconomic_factors)
+  print(socioeconomic_factors)
+  socio <- readline("Which socioeconomic factors do you want to include? Use commas to separate the values. If all, say ALL: ")
+  socio <- as.character(unlist(strsplit(socio, ", ")))
+  while(all(socio %in% socioeconomic_factors) == FALSE && socio != "ALL")
+  {
+    print("Invalud Entry. Please try again.")
+    socio <- readline("Which socioeconomic factors do you want to include? Use commas to separate the values. If all, say ALL: ")
+    socio <- as.character(unlist(strsplit(socio, ", ")))
+  }
+  if(socio == "ALL")
+  {
+    socio <- socioeconomic_factors
+  }
