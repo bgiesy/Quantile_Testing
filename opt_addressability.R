@@ -1,5 +1,5 @@
 options(scipen = 999)
-#source("sprklyRSpark.R")
+source("sprklyRSpark.R")
 library(readr)
 library(ggplot2)
 library(tictoc)
@@ -27,18 +27,20 @@ load_R_Native <- function()
   toc()
 }
 
-
 load_spark_csv <- function(sc)
 {##future dev note: file loading phase can be speeded up by using spark csv reader
   tic()
   print("Reading in export")
   raw_df <- spark_read_csv(sc, name = "sprkdf", "GWCM_FPDS_28_AUGUST_EXTRACT.tsv",delimiter = "\t", header = TRUE, overwrite = TRUE)
   toc( )
+  
+  print("Performing socio-economic factor clean-up")
+  raw_df <- raw_df %>% mutate(women_owned_flag = if_else(is.na(women_owned_flag), "NO", women_owned_flag))
+  raw_df <- raw_df %>% mutate(veteran_owned_flag = if_else(is.na(veteran_owned_flag), "NO", veteran_owned_flag))
+  raw_df <- raw_df %>% mutate(co_bus_size_determination_code = if_else(is.na(co_bus_size_determination_code), "O", veteran_owned_flag))
   print("Creating add_key for all transactions")
-  raw_df$women_owned_flag <- replace(as.character(raw_df$women_owned_flag), raw_df$women_owned_flag == "", "NO")
-  raw_df$veteran_owned_flag <- replace(as.character(raw_df$veteran_owned_flag), raw_df$veteran_owned_flag == "", "NO")
-  raw_df$co_bus_size_determination_code <- replace(as.character(raw_df$co_bus_size_determination_code), raw_df$co_bus_size_determination_code == "", "O")
-  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag)
+  raw_df <- raw_df %>% 
+    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code, "_", women_owned_flag, "_", veteran_owned_flag))
   #filter by date range to only have FY16
   tic()
   print("subsetting training transactions")
@@ -57,11 +59,13 @@ load_spark_parquet <- function()
   raw_df <- spark_read_parquet(sc, name="raw_df", path = "August28FPDS.prq/")
   #filter by date range to only have FY16
   toc()
+  print("Performing socio-economic factor clean-up")
+  raw_df <- raw_df %>% mutate(women_owned_flag = if_else(is.na(women_owned_flag), "NO", women_owned_flag))
+  raw_df <- raw_df %>% mutate(veteran_owned_flag = if_else(is.na(veteran_owned_flag), "NO", veteran_owned_flag))
+  raw_df <- raw_df %>% mutate(co_bus_size_determination_code = if_else(is.na(co_bus_size_determination_code), "O", veteran_owned_flag))
   print("Creating add_key for all transactions")
-  raw_df$women_owned_flag <- replace(as.character(raw_df$women_owned_flag), raw_df$women_owned_flag == "", "NO")
-  raw_df$veteran_owned_flag <- replace(as.character(raw_df$veteran_owned_flag), raw_df$veteran_owned_flag == "", "NO")
-  raw_df$co_bus_size_determination_code <- replace(as.character(raw_df$co_bus_size_determination_code), raw_df$co_bus_size_determination_code == "", "O")
-  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag)
+  raw_df <- raw_df %>% 
+    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_", co_bus_size_determination_code, "_", women_owned_flag, "_", veteran_owned_flag))
   tic()
   print("subsetting training transactions")
   training_transactions <<- raw_df %>% filter(as.Date(date_signed) >= as.Date("2014-10-01") & as.Date(date_signed) <= as.Date("2015-09-30"))
@@ -71,6 +75,7 @@ load_spark_parquet <- function()
   testing_transactions <<- raw_df %>% filter(as.Date(date_signed) >= as.Date("2015-10-01") & as.Date(date_signed) <= as.Date("2016-09-30"))
   toc()
 }
+
 
 
 opt_get_contract_totals <- function(contract_label, transaction_df)

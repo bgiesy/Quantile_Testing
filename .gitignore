@@ -1,0 +1,11 @@
+*.csv
+*.tsv
+*.zip
+*.Rproj
+log4j.*
+*.log
+.Rproj.user
+.Rhistory
+*.RData
+.Ruserdata
+*.prq

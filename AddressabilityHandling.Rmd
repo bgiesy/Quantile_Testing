@@ -1,0 +1,47 @@
+---
+title: "addressableObligations"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r loadfiles}
+sc <- sparkInit()
+load_spark_parquet()
+
+```
+
+```{r plotcats}
+totals <<- training_transactions %>% group_by(level_1_category) %>% summarise(cat_total = sum(dollars_obligated)) %>% collect
+
+totals %>% filter(is.na(level_1_category) == FALSE)%>%
+    ggplot(aes(x=as.factor(level_1_category), y=cat_total, label = cat_total) ) + 
+    geom_col() +geom_text(angle=90, color = "green", size = 3, position = position_stack(vjust = 0.5))+
+    theme(axis.text.x  = element_text(angle=90, vjust=0.5, size=10))
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r generate psc naics sb wo vo 8a tables}
+   #contract_list <- raw_df %>% filter(managing_agency == "GSA") %>% select(contract_name) %>% distinct()
+   #do an lapply here to generate a list of contract addresability matrices
+   addressability_matrix <- validated_generate_addressability_matrix_df("OASIS", training_transactions)  
+   addressable_obligations <- validated_generate_addressable_obs(addressability_matrix, testing_transactions)
+   print(addressable_obligations)
+```
+
