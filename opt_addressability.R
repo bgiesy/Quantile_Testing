@@ -32,6 +32,9 @@ load_spark_csv <- function(sc)
   print("Reading in export")
   raw_df <- spark_read_csv(sc, name = "sprkdf", "GWCM_FPDS_28_AUGUST_EXTRACT.tsv",delimiter = "\t", header = TRUE, overwrite = TRUE)
   toc( )
+  print("Creating add_key for all transactions")
+  raw_df$eight_a_flag <- replace(as.character(raw_df$eight_a_flag), raw_df$eight_a_flag == "", "NO")
+  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag, "_", raw_df$eight_a_flag)
   #filter by date range to only have FY16
   tic()
   print("subsetting training transactions")
@@ -50,6 +53,9 @@ load_spark_parquet <- function()
   raw_df <- spark_read_parquet(sc, name="raw_df", path = "August28FPDS.prq/")
   #filter by date range to only have FY16
   toc()
+  print("Creating add_key for all transactions")
+  raw_df$eight_a_flag <- replace(as.character(raw_df$eight_a_flag), raw_df$eight_a_flag == "", "NO")
+  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag, "_", raw_df$eight_a_flag)
   tic()
   print("subsetting training transactions")
   training_transactions <<- raw_df %>% filter(as.Date(date_signed) >= as.Date("2014-10-01") & as.Date(date_signed) <= as.Date("2015-09-30"))
@@ -79,13 +85,8 @@ validated_generate_addressability_matrix_df <- function(contract_label, sb = "O"
   print("Generating addressability matrix from training archive")
   tic()
   #Subset transaction archive to only the columns needed.
-  
-  
-  addressable_training_df <- testing_transactions %>% filter(contract_name == contract_label) %>%
-    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-    mutate(psc_naics = paste0(product_or_service_code,"_",naics_code))     
-  
-    addressability_matrix_df <-  addressable_training_df %>% 
+
+    addressability_matrix_df <-  testing_transactions %>% filter(contract_name == contract_label) %>% 
       distinct(contract_name, product_or_service_code, naics_code) %>% 
       mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_", sb, "_", wo, "_", vo, "_", eighta)) %>% select(add_key) %>% collect()
 
@@ -116,7 +117,7 @@ validated_generate_addressable_obs<-function(addressability_matrix, transaction_
   #    summarise(obligations = sum(dollars_obligated)) 
 }
 
-opt_gen_addressable_obs <- function(addressability_matrix, transaction_df, sb = FALSE, wo=FALSE, vo=FALSE, eighta=FALSE)
+opt_gen_addressable_obs <- function(addressability_matrix, transaction_df)
 {
   
   #sb
@@ -131,104 +132,105 @@ opt_gen_addressable_obs <- function(addressability_matrix, transaction_df, sb = 
   #wo
   #vo
   
+  addressability_obl <- transaction_df %>% filter(add_key %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  addressability_obl
   #default_case all variables == false -> provide only psc_naics combos
-  if(sb==FALSE & wo==FALSE & vo==FALSE & eighta==FALSE)
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(psc_naics = paste0(product_or_service_code,"_",naics_code))
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
+ # if(sb==FALSE & wo==FALSE & vo==FALSE & eighta==FALSE)
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(psc_naics = paste0(product_or_service_code,"_",naics_code))
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
   
   #	sb
-  else if(sb == TRUE & wo==FALSE & vo==FALSE & eighta==FALSE) 
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
+  #else if(sb == TRUE & wo==FALSE & vo==FALSE & eighta==FALSE) 
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
   #	sb, wo
-  else if(sb == TRUE & wo==TRUE& vo==FALSE & eighta==FALSE)   
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
+  #else if(sb == TRUE & wo==TRUE& vo==FALSE & eighta==FALSE)   
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
   #	sb, wo, vo
-  else if(sb == TRUE & wo==TRUE & vo ==TRUE & eighta==FALSE )    
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
+  #else if(sb == TRUE & wo==TRUE & vo ==TRUE & eighta==FALSE )    
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
   #sb, wo, 8a
-  else if(sb == TRUE & wo==TRUE & vo ==FALSE & eighta==TRUE ) 
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
+  #else if(sb == TRUE & wo==TRUE & vo ==FALSE & eighta==TRUE ) 
+  #{
+  
+  #testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
   #sb, wo, vo, 8a
-  else if(sb == TRUE & wo==TRUE & vo ==TRUE & eighta==TRUE )
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
-  #sb, vo, 8a
-  else if(sb == TRUE & wo==FALSE & vo ==TRUE & eighta==TRUE )    
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
-  #sb, vo
-  else if(sb == TRUE & wo==FALSE & vo ==TRUE & eighta==FALSE )  
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
-  #sb, 8a
-  else if(sb == TRUE & wo==FALSE & vo ==FALSE & eighta==TRUE )       
-  {
-    testing_df <- transaction_df %>% 
-      select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
-    
-    addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
-    addressability_obl
-  } 
-  #add wo
-  #add vo
-  #add 8a
-  else print(paste0("The variable combination sb==", sb, " wo==", wo, " vo==", vo, " eighta==", eighta, " is not covered"))
-  
-  
-  
+  #else if(sb == TRUE & wo==TRUE & vo ==TRUE & eighta==TRUE )
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
+  ##sb, vo, 8a
+  #else if(sb == TRUE & wo==FALSE & vo ==TRUE & eighta==TRUE )    
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
+  ##sb, vo
+  #else if(sb == TRUE & wo==FALSE & vo ==TRUE & eighta==FALSE )  
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
+  ##sb, 8a
+  #else if(sb == TRUE & wo==FALSE & vo ==FALSE & eighta==TRUE )       
+  #{
+  #  testing_df <- transaction_df %>% 
+  #    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+  #    mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_",co_bus_size_determination_code)) 
+  #  
+  #  addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
+  #  addressability_obl
+  #} 
+  ##add wo
+  ##add vo
+  ##add 8a
+  #else print(paste0("The variable combination sb==", sb, " wo==", wo, " vo==", vo, " eighta==", eighta, " is not covered"))
+   
 }
 
 opt_produce_addressability_for_bic <- function(bic_name, addressability_matrix, sb = FALSE, wo=FALSE, vo=FALSE, eighta=FALSE)
