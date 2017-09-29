@@ -1,3 +1,13 @@
+#generate_addressability_pool --- Creates pool of all add_keys associated with each contract solution.
+#calling_psc_naics --- calls specific add_keys we're interested in.
+
+#Even with the concatenated data frame, we'd still have to pass arguments in order to move from one column of a data frame 
+#to another. This is an easier method of doing so. 
+
+#We can still do a data frame method, we'd just have to add in another for-loop -- since we're storing an data frame of 
+#equal size for tableau reference, this method will also work -- we could break the list of data frames into different 
+#data frames as well.
+
 generate_addressability_pool <- function(transaction_df)
 {
   #Number of BICs in question
