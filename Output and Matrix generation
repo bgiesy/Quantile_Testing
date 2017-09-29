@@ -1,0 +1,50 @@
+generate_addressability_pool <- function(transaction_df)
+{
+  #Number of BICs in question
+  BIC <- unique(transaction_df$official_bic_contract)
+  
+  #eliminates NA value
+  BIC <- BIC[BIC!=""]
+
+  #Boolean choices for socioeconomic values
+  vo <- c("YES", "NO")
+  wo <- c("YES", "NO")
+  sb <- c("O", "S")
+  Output_Storage <- list()
+  
+  #Runs through all the BICs and creates all possible combinations of psc_naics and socioeconomic values and stores it in a list
+  for(i in 1:length(BIC))
+  {
+    #Finds all psc_naics in training_data that correspond with a specific BIC
+  list_of_psc_naics <- transaction_df %>% filter(official_bic_contract == BIC[i]) %>% select(product_or_service_code, naics_code)%>%
+     mutate(psc_naics = paste0(product_or_service_code,"_",naics_code)) %>% distinct(psc_naics)
+
+  #This creates all psc_naics_sb_wo_vo combinations -- 8 combinations (3 boolean options, 2^3) per psc_naics
+  psc_naics_storage <- outer(list_of_psc_naics$psc_naics, sb, function(i,j)paste0(i,"_", j))
+  psc_naics_storage <- outer(psc_naics_storage, wo, function(i,j)paste0(i,"_",j))
+  psc_naics_storage <- outer(psc_naics_storage, vo, function(i,j)paste0(i,"_",j))
+  
+  #This is to compensate for the oddity of 'outer' function output.
+  psc_naics_storage <- as.vector(psc_naics_storage)
+  STORAGE <- as.data.frame(psc_naics_storage)
+  STORAGE$psc_naics_storage <- as.character(STORAGE$psc_naics_storage)
+  
+  #Stores all the combinations as an entry in a list and names it.
+  Output_Storage[i] <- STORAGE
+  names(Output_Storage)[i] <- BIC[i]
+    
+  }
+}
+calling_psc_naics <- function(contract_solution, small, woman, veteran)
+{
+  #Arguments must be strings "OASIS", "S", "YES", "YES" etc -- or we have to add in "as.character(contract_solution)" lines
+  
+  #This will hunt through the list to find the list entry of the BIC in question
+  Storing <- get(contract_solution, Output_Storage)
+  
+  #Create combination of factors we're looking for -- "S_YES_YES"
+  Matching <- paste0(small, "_", woman, "_", veteran, "$")
+  
+  #Finds all add_keys that match the factors we're looking for.
+  OUTPUT <- subset(Storing, grepl(Matching, Storing))
+  }
