@@ -97,7 +97,7 @@ validated_generate_addressability_matrix_df <- function(contract_label, sb = "O"
   tic()
   #Subset transaction archive to only the columns needed.
 
-    addressability_matrix_df <-  testing_transactions %>% filter(contract_name == contract_label) %>% 
+    addressability_matrix_df <-  training_transactions %>% filter(contract_name == contract_label) %>% 
       distinct(contract_name, product_or_service_code, naics_code) %>% 
       mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_", sb, "_", wo, "_", vo)) %>% select(add_key) %>% collect()
 
