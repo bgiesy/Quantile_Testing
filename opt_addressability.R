@@ -12,8 +12,10 @@ load_R_Native <- function()
   raw_df <- read.table("GWCM_FPDS_28_AUGUST_EXTRACT.tsv", header = TRUE, comment.char = "", sep = "\t", quote = "", fill = TRUE, stringsAsFactors = FALSE)
   toc()
   print("Creating add_key for all transactions")
-  raw_df$eight_a_flag <- replace(as.character(raw_df$eight_a_flag), raw_df$eight_a_flag == "", "NO")
-  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag, "_", raw_df$eight_a_flag)
+  raw_df$women_owned_flag <- replace(as.character(raw_df$women_owned_flag), raw_df$women_owned_flag == "", "NO")
+  raw_df$veteran_owned_flag <- replace(as.character(raw_df$veteran_owned_flag), raw_df$veteran_owned_flag == "", "NO")
+  raw_df$co_bus_size_determination_code <- replace(as.character(raw_df$co_bus_size_determination_code), raw_df$co_bus_size_determination_code == "", "O")
+  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag)
   #filter by date range to only have FY16
   tic()
   print("subsetting training transactions")
@@ -33,8 +35,10 @@ load_spark_csv <- function(sc)
   raw_df <- spark_read_csv(sc, name = "sprkdf", "GWCM_FPDS_28_AUGUST_EXTRACT.tsv",delimiter = "\t", header = TRUE, overwrite = TRUE)
   toc( )
   print("Creating add_key for all transactions")
-  raw_df$eight_a_flag <- replace(as.character(raw_df$eight_a_flag), raw_df$eight_a_flag == "", "NO")
-  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag, "_", raw_df$eight_a_flag)
+  raw_df$women_owned_flag <- replace(as.character(raw_df$women_owned_flag), raw_df$women_owned_flag == "", "NO")
+  raw_df$veteran_owned_flag <- replace(as.character(raw_df$veteran_owned_flag), raw_df$veteran_owned_flag == "", "NO")
+  raw_df$co_bus_size_determination_code <- replace(as.character(raw_df$co_bus_size_determination_code), raw_df$co_bus_size_determination_code == "", "O")
+  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag)
   #filter by date range to only have FY16
   tic()
   print("subsetting training transactions")
@@ -54,8 +58,10 @@ load_spark_parquet <- function()
   #filter by date range to only have FY16
   toc()
   print("Creating add_key for all transactions")
-  raw_df$eight_a_flag <- replace(as.character(raw_df$eight_a_flag), raw_df$eight_a_flag == "", "NO")
-  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag, "_", raw_df$eight_a_flag)
+  raw_df$women_owned_flag <- replace(as.character(raw_df$women_owned_flag), raw_df$women_owned_flag == "", "NO")
+  raw_df$veteran_owned_flag <- replace(as.character(raw_df$veteran_owned_flag), raw_df$veteran_owned_flag == "", "NO")
+  raw_df$co_bus_size_determination_code <- replace(as.character(raw_df$co_bus_size_determination_code), raw_df$co_bus_size_determination_code == "", "O")
+  raw_df$add_key <- paste0(raw_df$product_or_service_code,"_",raw_df$naics_code,"_", raw_df$co_bus_size_determination_code, "_", raw_df$women_owned_flag, "_", raw_df$veteran_owned_flag)
   tic()
   print("subsetting training transactions")
   training_transactions <<- raw_df %>% filter(as.Date(date_signed) >= as.Date("2014-10-01") & as.Date(date_signed) <= as.Date("2015-09-30"))
@@ -80,7 +86,7 @@ opt_get_contract_totals <- function(contract_label, transaction_df)
 
 ## you will need to add the socio-economic logical variables here to produce the required add_key combination
 ## the case below only covers F,F,F,F
-validated_generate_addressability_matrix_df <- function(contract_label, sb = "O", wo="NO", vo="NO", eighta="NO")
+validated_generate_addressability_matrix_df <- function(contract_label, sb = "O", wo="NO", vo="NO")
 {
   print("Generating addressability matrix from training archive")
   tic()
@@ -88,7 +94,7 @@ validated_generate_addressability_matrix_df <- function(contract_label, sb = "O"
 
     addressability_matrix_df <-  testing_transactions %>% filter(contract_name == contract_label) %>% 
       distinct(contract_name, product_or_service_code, naics_code) %>% 
-      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_", sb, "_", wo, "_", vo, "_", eighta)) %>% select(add_key) %>% collect()
+      mutate(add_key = paste0(product_or_service_code,"_",naics_code,"_", sb, "_", wo, "_", vo)) %>% select(add_key) %>% collect()
 
   #capture of the psc_naics keys
   add_key_vector <- addressability_matrix_df %>% .$add_key
@@ -108,7 +114,7 @@ validated_generate_addressability_matrix_df <- function(contract_label, sb = "O"
 validated_generate_addressable_obs<-function(addressability_matrix, transaction_df)
 {
   testing_df <- transaction_df %>% 
-    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, eight_a_flag, dollars_obligated)%>%
+    select(contract_name, product_or_service_code, naics_code, co_bus_size_determination_code, women_owned_flag, veteran_owned_flag, dollars_obligated)%>%
     mutate(psc_naics = paste0(product_or_service_code,"_",naics_code))
   
   addressability_obl <- testing_df %>% filter(psc_naics %in% addressability_matrix) %>% select(dollars_obligated) %>% collect() %>% sum()
