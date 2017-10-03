@@ -133,3 +133,26 @@ Create_value_matrix <- function(df)
     test <- test+1
   }
 }
+
+
+create_value_matrix_dataframe <- function(df)
+{
+#Takes add_key dataframe and generates value dataframe.
+value_matrix <- data.frame(matrix(NA, nrow = nrow(df), ncol = ncol(df)))
+  for(z in 1:ncol(df))
+  {
+    for(a in 1:nrow(df))
+    {
+      if(is.na(as.character(df[a,z])) == TRUE)
+      {
+        value_matrix[a,z] == NA
+      }
+      else
+      {
+        value <- filter(df, df$add_key == as.character(df[a,z])) %>% select(dollars_obligated)
+        value_matrix[a,z] <- sum(value$dollars_obligated)
+      }
+    }
+    print(paste0("Working on ", colnames(df)[z]))
+  }
+}
