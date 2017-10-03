@@ -98,3 +98,38 @@ calling_psc_naics <- function(contract_solution, small, woman, veteran)
   df <- mapply(function(x,y) c(x, rep(NA,y)), mylist, len)
   
 }
+Create_value_matrix <- function(df)
+{
+  
+  final_list <- list()
+  test <- 1
+  for(z in 1:ncol(df))
+  {
+    output <- data.frame()
+    for(a in 1:length(df[,z]))
+    {
+      output[a,1] <- df[a,z]
+      
+      if(is.na(output[a,1]))
+      {
+        output[a,2] <- NA
+      }
+      else
+      {     
+        value <- filter(FY16_df, FY16_df$add_key %in% df[a,z]) %>% select(dollars_obligated)
+        
+        
+        if(nrow(value) != 0)
+        {
+          output[a,2] <- sum(value$dollars_obligated)
+        }
+        else{
+          output[a,2] <- 0
+        }
+      }
+      
+    }
+    final_list[[test]] <- output
+    test <- test+1
+  }
+}
