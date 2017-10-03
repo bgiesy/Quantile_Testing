@@ -58,3 +58,43 @@ calling_psc_naics <- function(contract_solution, small, woman, veteran)
   #Finds all add_keys that match the factors we're looking for.
   OUTPUT <- subset(Storing, grepl(Matching, Storing))
   }
+  
+  generate_addressability_matrices_for_all_alternative_method <- function(transaction_df)
+{
+  #Number of BICs in question
+  BIC <- unique(transaction_df$official_bic_contract)
+  
+  #eliminates NA value
+  BIC <- BIC[BIC!=""]
+  transaction_df$psc_naics_combo <- paste0(transaction_df$product_or_service_code, "_", transaction_df$naics_code)
+  #Boolean choices for socioeconomic values
+  vo <- c("YES", "NO")
+  wo <- c("YES", "NO")
+  sb <- c("O", "S")
+  
+  names_vector <- vector()
+  hold <- 1
+  mylist <- list()
+  for(i in 1:length(BIC))
+  {
+    for(m in 1:length(sb))
+    {
+      for(j in 1:length(wo))
+      {
+       for(k in 1:length(vo))
+        {
+        CLNAME <- paste0(BIC[i],"_", sb[m], "_", wo[j], "_", vo[k])
+        names_vector[hold] <- CLNAME
+        mylist[hold] <- filter(FY16_df, FY16_df$official_bic_contract == BIC[i]) %>% distinct(psc_naics_combo) %>% 
+        mutate(add_key = paste0(psc_naics_combo,"_", sb[m], "_", wo[j], "_", vo[k])) %>% distinct(add_key)
+        hold <- hold+1
+        }
+      }
+    }
+  }
+  len <- sapply(mylist, length)
+  n <- max(len)
+  len <- n - len
+  df <- mapply(function(x,y) c(x, rep(NA,y)), mylist, len)
+  
+}
